@@ -17,4 +17,5 @@ class WorkflowResponse(BaseModel):
     ticket_id: int
     category: str
     confidence: float
+    generated_response: str
     status: str

@@ -60,5 +60,6 @@ class SupportTicketWorkflow:
             ticket_id=ticket.ticket_id,
             category=classification.category,
             confidence=classification.confidence,
+            generated_response=response,
             status=status,
         )
