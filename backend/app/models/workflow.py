@@ -15,6 +15,7 @@ class TicketClassification(BaseModel):
 
 class WorkflowResponse(BaseModel):
     ticket_id: int
+    trace_id: str
     category: str
     confidence: float
     generated_response: str

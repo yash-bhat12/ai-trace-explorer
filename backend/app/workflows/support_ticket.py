@@ -1,3 +1,6 @@
+import time
+
+from backend.app.tracing.tracer import WorkflowTracer
 from backend.app.models.workflow import (
     TicketRequest,
     TicketClassification,
@@ -45,21 +48,64 @@ class SupportTicketWorkflow:
         return len(response) > 10
 
     def execute(self, ticket: TicketRequest):
+        tracer = WorkflowTracer()
+        start = time.time()
 
         classification = self.classify_ticket(ticket)
 
+        end = time.time()
+
+        tracer.record_span(
+            "Classification",
+            start,
+            end,
+            "completed"
+        )
+        start = time.time()
+
         context = self.retrieve_context(classification)
+
+        end = time.time()
+
+        tracer.record_span(
+            "Retrieval",
+            start,
+            end,
+            "completed"
+        )
+        start = time.time()
 
         response = self.generate_response(classification.category)
 
+        end = time.time()
+
+        tracer.record_span(
+            "Generation",
+            start,
+            end,
+            "completed"
+        )
+        start = time.time()
+
         is_valid = self.validate_response(response)
 
-        status = "completed" if is_valid else "failed"
+        end = time.time()
 
-        return WorkflowResponse(
-            ticket_id=ticket.ticket_id,
-            category=classification.category,
-            confidence=classification.confidence,
-            generated_response=response,
-            status=status,
+        tracer.record_span(
+            "Validation",
+            start,
+            end,
+            "completed"
         )
+
+        status = "completed" if is_valid else "failed"
+        trace = tracer.get_trace()
+        print(trace.model_dump_json(indent=4))  
+        return WorkflowResponse(
+        ticket_id=ticket.ticket_id,
+        trace_id=trace.trace_id,
+        category=classification.category,
+        confidence=classification.confidence,
+        generated_response=response,
+        status=status,
+)
