@@ -1,5 +1,7 @@
+print("Loaded tracer.py")
 import uuid
 import time
+from functools import wraps
 
 from backend.app.models.trace import Trace, Span
 
@@ -13,18 +15,45 @@ class WorkflowTracer:
             spans=[]
         )
 
-    def record_span(self, step_name, start_time, end_time, status):
+    def trace_step(self, step_name):
 
-        latency = (end_time - start_time) * 1000
+        def decorator(func):
 
-        self.trace.spans.append(
-            Span(
-                step=step_name,
-                status=status,
-                latency_ms=round(latency, 2)
-            )
-        )
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+
+                start = time.time()
+
+                status = "completed"
+
+                try:
+                    result = func(*args, **kwargs)
+
+                except Exception:
+
+                    status = "failed"
+
+                    raise
+
+                finally:
+
+                    end = time.time()
+
+                    latency = (end - start) * 1000
+
+                    self.trace.spans.append(
+                        Span(
+                            step=step_name,
+                            status=status,
+                            latency_ms=round(latency, 2)
+                        )
+                    )
+
+                return result
+
+            return wrapper
+
+        return decorator
 
     def get_trace(self):
-
         return self.trace

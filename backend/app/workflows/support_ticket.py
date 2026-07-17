@@ -1,11 +1,11 @@
-import time
-
-from backend.app.tracing.tracer import WorkflowTracer
 from backend.app.models.workflow import (
     TicketRequest,
     TicketClassification,
     WorkflowResponse,
 )
+
+from backend.app.tracing.tracer import WorkflowTracer
+from backend.app.storage.trace_store import trace_store
 
 
 class SupportTicketWorkflow:
@@ -48,64 +48,41 @@ class SupportTicketWorkflow:
         return len(response) > 10
 
     def execute(self, ticket: TicketRequest):
+
+        # Create a tracer for this workflow execution
         tracer = WorkflowTracer()
-        start = time.time()
 
-        classification = self.classify_ticket(ticket)
+        # Wrap each workflow step with automatic tracing
+        classification_step = tracer.trace_step("Classification")(self.classify_ticket)
+        retrieval_step = tracer.trace_step("Retrieval")(self.retrieve_context)
+        generation_step = tracer.trace_step("Generation")(self.generate_response)
+        validation_step = tracer.trace_step("Validation")(self.validate_response)
 
-        end = time.time()
+        # Execute the workflow
+        classification = classification_step(ticket)
 
-        tracer.record_span(
-            "Classification",
-            start,
-            end,
-            "completed"
-        )
-        start = time.time()
+        context = retrieval_step(classification)
 
-        context = self.retrieve_context(classification)
+        response = generation_step(classification.category)
 
-        end = time.time()
-
-        tracer.record_span(
-            "Retrieval",
-            start,
-            end,
-            "completed"
-        )
-        start = time.time()
-
-        response = self.generate_response(classification.category)
-
-        end = time.time()
-
-        tracer.record_span(
-            "Generation",
-            start,
-            end,
-            "completed"
-        )
-        start = time.time()
-
-        is_valid = self.validate_response(response)
-
-        end = time.time()
-
-        tracer.record_span(
-            "Validation",
-            start,
-            end,
-            "completed"
-        )
+        is_valid = validation_step(response)
 
         status = "completed" if is_valid else "failed"
+
+        # Get the completed trace
         trace = tracer.get_trace()
-        print(trace.model_dump_json(indent=4))  
+
+        # Save the trace
+        trace_store.save(trace)
+
+        # Print the trace in the terminal (temporary for debugging)
+        print(trace.model_dump_json(indent=4))
+
         return WorkflowResponse(
-        ticket_id=ticket.ticket_id,
-        trace_id=trace.trace_id,
-        category=classification.category,
-        confidence=classification.confidence,
-        generated_response=response,
-        status=status,
-)
+            ticket_id=ticket.ticket_id,
+            trace_id=trace.trace_id,
+            category=classification.category,
+            confidence=classification.confidence,
+            generated_response=response,
+            status=status,
+        )
