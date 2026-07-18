@@ -41,6 +41,9 @@ class SupportTicketWorkflow:
 
     def generate_response(self, category: str):
 
+        if category == "Billing":
+            raise Exception("LLM provider unavailable")
+
         return f"Support response generated for {category}."
 
     def validate_response(self, response: str):

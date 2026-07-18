@@ -1,7 +1,7 @@
-print("Loaded tracer.py")
 import uuid
 import time
 from functools import wraps
+from datetime import datetime
 
 from backend.app.models.trace import Trace, Span
 
@@ -26,12 +26,21 @@ class WorkflowTracer:
 
                 status = "completed"
 
+                result = None
+
+                error = None
+
                 try:
+
                     result = func(*args, **kwargs)
 
-                except Exception:
+                    return result
+
+                except Exception as e:
 
                     status = "failed"
+
+                    error = str(e)
 
                     raise
 
@@ -39,21 +48,26 @@ class WorkflowTracer:
 
                     end = time.time()
 
-                    latency = (end - start) * 1000
+                    latency = round((end - start) * 1000, 2)
 
                     self.trace.spans.append(
+
                         Span(
                             step=step_name,
                             status=status,
-                            latency_ms=round(latency, 2)
+                            latency_ms=latency,
+                            timestamp=datetime.now(),
+                            input_data=str(args),
+                            output_data=str(result),
+                            error=error
                         )
-                    )
 
-                return result
+                    )
 
             return wrapper
 
         return decorator
 
     def get_trace(self):
+
         return self.trace
