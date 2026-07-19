@@ -1,5 +1,6 @@
 import uuid
 import time
+
 from functools import wraps
 from datetime import datetime
 
@@ -15,7 +16,14 @@ class WorkflowTracer:
             spans=[]
         )
 
-    def trace_step(self, step_name):
+    def trace_step(
+        self,
+        step_name,
+        prompt=None,
+        model=None,
+        provider=None,
+        artifacts=None,
+    ):
 
         def decorator(func):
 
@@ -46,9 +54,7 @@ class WorkflowTracer:
 
                 finally:
 
-                    end = time.time()
-
-                    latency = round((end - start) * 1000, 2)
+                    latency = round((time.time() - start) * 1000, 2)
 
                     self.trace.spans.append(
 
@@ -57,9 +63,24 @@ class WorkflowTracer:
                             status=status,
                             latency_ms=latency,
                             timestamp=datetime.now(),
+
                             input_data=str(args),
+
                             output_data=str(result),
-                            error=error
+
+                            prompt=prompt,
+
+                            model=model,
+
+                            provider=provider,
+
+                            token_usage=120,
+
+                            estimated_cost=0.0008,
+
+                            artifacts=artifacts or [],
+
+                            error=error,
                         )
 
                     )

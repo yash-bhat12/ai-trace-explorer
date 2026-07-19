@@ -41,9 +41,6 @@ class SupportTicketWorkflow:
 
     def generate_response(self, category: str):
 
-        if category == "Billing":
-            raise Exception("LLM provider unavailable")
-
         return f"Support response generated for {category}."
 
     def validate_response(self, response: str):
@@ -52,16 +49,40 @@ class SupportTicketWorkflow:
 
     def execute(self, ticket: TicketRequest):
 
-        # Create a tracer for this workflow execution
+        # Create tracer for this workflow
         tracer = WorkflowTracer()
 
-        # Wrap each workflow step with automatic tracing
-        classification_step = tracer.trace_step("Classification")(self.classify_ticket)
-        retrieval_step = tracer.trace_step("Retrieval")(self.retrieve_context)
-        generation_step = tracer.trace_step("Generation")(self.generate_response)
-        validation_step = tracer.trace_step("Validation")(self.validate_response)
+        # Classification Step
+        classification_step = tracer.trace_step(
+            step_name="Classification",
+            prompt="Classify the support ticket",
+            model="gpt-4.1",
+            provider="OpenAI"
+        )(self.classify_ticket)
 
-        # Execute the workflow
+        # Retrieval Step
+        retrieval_step = tracer.trace_step(
+            step_name="Retrieval",
+            artifacts=[
+                "Knowledge Base Article 001",
+                "Internal Support Guide"
+            ]
+        )(self.retrieve_context)
+
+        # Generation Step
+        generation_step = tracer.trace_step(
+            step_name="Generation",
+            prompt="Generate helpful customer response",
+            model="gpt-4.1",
+            provider="OpenAI"
+        )(self.generate_response)
+
+        # Validation Step
+        validation_step = tracer.trace_step(
+            step_name="Validation"
+        )(self.validate_response)
+
+        # Execute workflow
         classification = classification_step(ticket)
 
         context = retrieval_step(classification)
@@ -72,14 +93,11 @@ class SupportTicketWorkflow:
 
         status = "completed" if is_valid else "failed"
 
-        # Get the completed trace
+        # Get completed trace
         trace = tracer.get_trace()
 
-        # Save the trace
+        # Save trace
         trace_store.save(trace)
-
-        # Print the trace in the terminal (temporary for debugging)
-        print(trace.model_dump_json(indent=4))
 
         return WorkflowResponse(
             ticket_id=ticket.ticket_id,
